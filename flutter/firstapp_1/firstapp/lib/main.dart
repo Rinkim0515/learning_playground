@@ -7,23 +7,27 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: "First App",
-      theme: ThemeData(primarySwatch: Colors.blue),
-      home: MyHomePage(),
-    );
+    return MaterialApp(title: "Character Card", home: MyCard());
   }
 }
 
-class MyHomePage extends StatelessWidget {
-  const MyHomePage({super.key});
+class MyCard extends StatelessWidget {
+  const MyCard({super.key});
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('First App')),
+      appBar: AppBar(
+        title: Text("BBANTO"),
+        centerTitle: true,
+        backgroundColor: Colors.redAccent,
+        elevation: 0.0,
+      ),
       body: Center(
-        child: Column(children: [Text('Hello'), Text('Hello'), Text('Hello')]),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [Text("Hello"), Text("Hello"), Text("Hello")],
+        ),
       ),
     );
   }
