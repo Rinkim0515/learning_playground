@@ -6,15 +6,13 @@
 //
 
 import UIKit
-
 import RxSwift
 import RxCocoa
 import RxDataSources
 
-
 class CalendarViewController: UIViewController {
-    
-    private var dataSource: RxCollectionViewSectionedReloadDataSource<CalendarSectionModel>!
+
+    private var dataSource: RxCollectionViewSectionedReloadDataSource<CalendarSection>!
 
     private let disposeBag = DisposeBag()
     private let viewModel = CalVM()
@@ -22,7 +20,6 @@ class CalendarViewController: UIViewController {
         let layout = CalendarViewController.createLayout()
         let collectionView = UICollectionView(frame: .zero, collectionViewLayout: layout)
         collectionView.showsHorizontalScrollIndicator = false
-        
         collectionView.backgroundColor = .white
         return collectionView
     }()
@@ -32,65 +29,74 @@ class CalendarViewController: UIViewController {
         super.viewDidLoad()
         setupUI()
         bindViewModel()
-        
+        DispatchQueue.main.async {
+            let indexPath = IndexPath(item: 0, section: 1) // 현재 달 기준으로 가운데 이동
+            self.collectionView.scrollToItem(at: indexPath, at: .centeredHorizontally, animated: false)
+        }
     }
 
     private func setupUI() {
-        
-
-
-        
         view.addSubview(collectionView)
         collectionView.translatesAutoresizingMaskIntoConstraints = false
+
+        collectionView.isPagingEnabled = false
+        collectionView.showsHorizontalScrollIndicator = false
+        collectionView.showsVerticalScrollIndicator = false
+        collectionView.alwaysBounceHorizontal = true
+        collectionView.alwaysBounceVertical = false
+        collectionView.bounces = false
+        collectionView.decelerationRate = .fast
+        collectionView.isScrollEnabled = true
 
         NSLayoutConstraint.activate([
             collectionView.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 16),
             collectionView.centerXAnchor.constraint(equalTo: view.centerXAnchor),
-            collectionView.widthAnchor.constraint(equalTo: view.widthAnchor, multiplier: 0.95),
+            collectionView.widthAnchor.constraint(equalTo: view.widthAnchor),
             collectionView.heightAnchor.constraint(equalToConstant: 500)
         ])
 
         collectionView.register(CalendarCell.self, forCellWithReuseIdentifier: "CalendarCell")
         collectionView.backgroundColor = .white
-        collectionView.isPagingEnabled = false // ❗️groupPaging 사용 중엔 false 유지
     }
-    
-    
+
     private func bindViewModel() {
         let input = CalVM.Input(currentMonth: currentMonthRelay.asObservable())
         let output = viewModel.transform(input: input)
 
-        self.dataSource = RxCollectionViewSectionedReloadDataSource<CalendarSectionModel> (
+        self.dataSource = RxCollectionViewSectionedReloadDataSource<CalendarSection> (
             configureCell: { _, collectionView, indexPath, item in
                 let cell = collectionView.dequeueReusableCell(
                     withReuseIdentifier: "CalendarCell",
                     for: indexPath
                 ) as! CalendarCell
-                cell.bind(item) // ⬅️ CalendarItem 데이터를 셀에 넘김
+                cell.bind(item)
                 return cell
             }
         )
 
         output.sections
+            .do(onNext: { sections in
+                print("🔍 섹션 수: \(sections.count)")
+                sections.forEach { print("📆 섹션: \($0.model), 아이템 수: \($0.items.count)") }
+            })
             .bind(to: collectionView.rx.items(dataSource: dataSource))
             .disposed(by: disposeBag)
     }
-
 }
 
-
 extension CalendarViewController {
-    //왜 전역으로?
     static func createLayout() -> UICollectionViewCompositionalLayout {
+        let screenWidth = UIScreen.main.bounds.width
+
         let itemSize = NSCollectionLayoutSize(
-            widthDimension: .fractionalWidth(1.0 / 7.0),
-            heightDimension: .fractionalHeight(1.0)
+            widthDimension: .absolute(screenWidth / 7),
+            heightDimension: .absolute(500 / 6)
         )
         let item = NSCollectionLayoutItem(layoutSize: itemSize)
-        
+
         let horizontalGroupSize = NSCollectionLayoutSize(
-            widthDimension: .fractionalWidth(1.0),
-            heightDimension: .fractionalHeight(1.0 / 6.0) // 6줄 구성
+            widthDimension: .absolute(screenWidth),
+            heightDimension: .absolute(500 / 6)
         )
         let horizontalGroup = NSCollectionLayoutGroup.horizontal(
             layoutSize: horizontalGroupSize,
@@ -99,34 +105,43 @@ extension CalendarViewController {
         )
 
         let verticalGroupSize = NSCollectionLayoutSize(
-            widthDimension: .fractionalWidth(1.0),
-            heightDimension: .fractionalHeight(1.0)
+            widthDimension: .absolute(screenWidth),
+            heightDimension: .absolute(500)
         )
         let verticalGroup = NSCollectionLayoutGroup.vertical(
             layoutSize: verticalGroupSize,
             subitems: Array(repeating: horizontalGroup, count: 6)
         )
-        
+
         let section = NSCollectionLayoutSection(group: verticalGroup)
-        section.orthogonalScrollingBehavior = .groupPaging
-        return UICollectionViewCompositionalLayout(section: section)
+        section.orthogonalScrollingBehavior = .groupPagingCentered
+
+        let config = UICollectionViewCompositionalLayoutConfiguration()
+        config.scrollDirection = .horizontal
+
+        return UICollectionViewCompositionalLayout(section: section, configuration: config)
     }
 }
 
-
 extension CalendarViewController: UIScrollViewDelegate {
-    
     func scrollViewDidEndDecelerating(_ scrollView: UIScrollView) {
-        let visibleRect = CGRect(origin: collectionView.contentOffset, size: collectionView.bounds.size)
-        let center = CGPoint(x: visibleRect.midX, y: visibleRect.midY)
+        let offsetX = scrollView.contentOffset.x
+        let width = scrollView.bounds.width
+        let pageIndex = Int(round(offsetX / width))
 
-        guard let indexPath = collectionView.indexPathForItem(at: center),
-              let item = try? dataSource.model(at: indexPath) as? CalendarItem else {
-            return
+        guard let sectionModel = try? dataSource.sectionModels[safe: pageIndex] else { return }
+
+        let sectionMonthString = sectionModel.model
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM"
+        if let date = formatter.date(from: sectionMonthString) {
+            currentMonthRelay.accept(date)
         }
-
-        let newMonth = DateManager.shared.getFirstDayInMonth(date: item.date)
-        currentMonthRelay.accept(newMonth)
     }
-    
+}
+
+extension Array {
+    subscript(safe index: Index) -> Element? {
+        return indices.contains(index) ? self[index] : nil
+    }
 }
