@@ -1,11 +1,3 @@
-//
-//  CalVM.swift
-//  Practice
-//
-//  Created by KimRin on 4/8/25.
-//.00000000
-
-// ✅ 업데이트된 ViewModel: 섹션 3개 구성 (이전/현재/다음)
 import Foundation
 import RxSwift
 import RxDataSources

@@ -1,9 +1,5 @@
-//
 //  CalVC.swift
 //  Practice
-//
-//  Created by KimRin on 4/8/25.
-//
 
 import UIKit
 import RxSwift
@@ -114,7 +110,7 @@ extension CalendarViewController {
         )
 
         let section = NSCollectionLayoutSection(group: verticalGroup)
-        section.orthogonalScrollingBehavior = .groupPagingCentered
+        section.orthogonalScrollingBehavior = .paging
 
         let config = UICollectionViewCompositionalLayoutConfiguration()
         config.scrollDirection = .horizontal
